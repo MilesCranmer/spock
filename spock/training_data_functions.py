@@ -324,7 +324,11 @@ def findres2(sim, i1, i2):
 
 def findresv3(sim, i1, i2):
     maxorder = 2
-    ps = Poincare.from_Simulation(sim=sim).particles # get averaged mean motions
+    try:
+        ps = Poincare.from_Simulation(sim=sim, average=False).particles # get averaged mean motions
+    except:
+        return np.nan, np.nan, np.nan
+
     n1 = ps[i1].n
     n2 = ps[i2].n
 
@@ -446,7 +450,7 @@ def ressummaryfeaturesxgb(sim, args):
             i1, i2 = int(i1), int(i2)
             eminus[j, i] = np.sqrt((ps[i2].e*np.cos(ps[i2].pomega)-ps[i1].e*np.cos(ps[i1].pomega))**2 + (ps[i2].e*np.sin(ps[i2].pomega)-ps[i1].e*np.sin(ps[i1].pomega))**2)
             if js[j] != -1:
-                pvars = Poincare.from_Simulation(sim)
+                pvars = Poincare.from_Simulation(sim, average=False)
                 avars = Andoyer.from_Poincare(pvars, j=int(js[j]), k=int(ks[j]), a10=a0[i1], i1=i1, i2=i2)
                 rebound_Z[j, i] = avars.Z
                 rebound_phi[j, i] = avars.phi
@@ -1123,10 +1127,11 @@ def resparamsv5(sim, args, trio):
 
     features = OrderedDict()
     ps = sim.particles
-    N = 4
-    a0 = [0] + [sim.particles[i].a for i in trio]
+    N = sim.N - sim.N_var
+    a0 = [0] + [sim.particles[i].a for i in range(1, N)]
     Npairs = int((N-1)*(N-2)/2)
 
+    print('running on', trio)
     pairs = getpairsv5(sim, trio)
     for i, [label, i1, i2] in enumerate(pairs):
         # recalculate with new ordering
@@ -1137,7 +1142,7 @@ def resparamsv5(sim, args, trio):
         features["C_AMD"+label] = AMD_stability_coefficient(sim, i1, i2)
         features['reshalfwidth'+label] = np.nan # so we always populate in case there's no  separatrix
         if features['strength'+label] > 0:
-            pvars = Poincare.from_Simulation(sim)
+            pvars = Poincare.from_Simulation(sim, average=False)
             avars = Andoyer.from_Poincare(pvars, j=int(features['j'+label]), k=int(features['k'+label]), a10=a0[i1], i1=i1, i2=i2)
             Zsepinner = avars.Zsep_inner # always positive, location at (-Zsepinner, 0)
             Zsepouter = avars.Zsep_outer
@@ -1174,14 +1179,15 @@ def restseriesv5(sim, args, trio): # corresponds to ressummaryfeaturesxgbv5
     pairs = getpairsv5(sim, trio)
 
     AMD0 = 0
-    N = 4
-    a0 = [0] + [ps[i].a for i in trio]
-    for p in [ps[i] for i in trio]:
+    N = sim.N - sim.N_var
+    a0 = [0] + [sim.particles[i].a for i in range(1, N)]
+    for p in [ps[i] for i in trio]: #TODO: Dan, is this correct? Or should AMD0 be the entire range(1, N)?
         AMD0 += p.m*np.sqrt(sim.G*ps[0].m*p.a)*(1-np.sqrt(1-p.e**2)*np.cos(p.inc))
 
     val = np.zeros((Nout, 27))
     for i, time in enumerate(times):
         try:
+            #print(sim.t)
             sim.integrate(time, exact_finish_time=0)
         except:
             break
@@ -1198,7 +1204,10 @@ def restseriesv5(sim, args, trio): # corresponds to ressummaryfeaturesxgbv5
             val[i,Ns*j+1] = np.sqrt((ps[i2].e*np.cos(ps[i2].pomega)-ps[i1].e*np.cos(ps[i1].pomega))**2 + (ps[i2].e*np.sin(ps[i2].pomega)-ps[i1].e*np.sin(ps[i1].pomega))**2) / features['EMcross'+label]# eminus
             val[i,Ns*j+2] = np.sqrt((ps[i1].m*ps[i1].e*np.cos(ps[i1].pomega) + ps[i2].m*ps[i2].e*np.cos(ps[i2].pomega))**2 + (ps[i1].m*ps[i1].e*np.sin(ps[i1].pomega) + ps[i2].m*ps[i2].e*np.sin(ps[i2].pomega))**2)/(ps[i1].m+ps[i2].m) # eeplus
             if features['strength'+label] > 0:
-                pvars = Poincare.from_Simulation(sim)
+                try:
+                    pvars = Poincare.from_Simulation(sim, average=False)
+                except:
+                    return val * np.nan
                 avars = Andoyer.from_Poincare(pvars, j=int(features['j'+label]), k=int(features['k'+label]), a10=a0[i1], i1=i1, i2=i2)
            
                 Z = avars.Z

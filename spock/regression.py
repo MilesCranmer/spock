@@ -12,7 +12,7 @@ from torch.nn import Parameter
 from torch.autograd import Variable
 from torch.functional import F
 from .training_data_functions import restseriesv5, orbtseries
-from feature_functions import get_tseries, init_sim
+from .feature_functions import get_tseries, init_sim
 
 
 
@@ -281,7 +281,12 @@ class StabilityRegression(object):
 
             out = out.reshape(-1, samples, 2)
             a, b = (4 - out[..., 0]) / out[..., 1], (12 - out[..., 0]) / out[..., 1]
-            full_samples = truncnorm.rvs(a, b, loc=out[..., 0], scale=out[..., 1])
+            if np.any(~np.isfinite(a)):
+                return 10**(np.ones(samples) * 4)
+            try:
+                full_samples = truncnorm.rvs(a, b, loc=out[..., 0], scale=out[..., 1])
+            except ValueError: #Unstable.
+                return 10**(np.ones(samples) * 4)
             all_full_samples.append(full_samples)
 
         out = np.array(all_full_samples)
