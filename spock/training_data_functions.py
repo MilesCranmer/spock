@@ -1131,7 +1131,6 @@ def resparamsv5(sim, args, trio):
     a0 = [0] + [sim.particles[i].a for i in range(1, N)]
     Npairs = int((N-1)*(N-2)/2)
 
-    print('running on', trio)
     pairs = getpairsv5(sim, trio)
     for i, [label, i1, i2] in enumerate(pairs):
         # recalculate with new ordering
