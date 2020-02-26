@@ -27,7 +27,7 @@ end = start + 437
 if end > 17500:
     end = 17500
 
-spockoutfile = 'alysa-datafiles/spockprobstesttrio{}_to_{}.npz'.format(start, end)
+spockoutfile = 'alysa-datafiles/spockprobstesttrio{}_to_{}_v3.npz'.format(start, end)
 
 stride = 10
 nsim_list = np.arange(0, 17500)
@@ -103,8 +103,9 @@ def pred(nsim):
     sim.init_megno(seed=0)
     sim.integrator="whfast"
     sim.dt = 0.07*sim.particles[1].P
-    prob = 10**np.average(np.log10(model.predict(sim, samples=10000)))
-    print("Done", nsim, "with", prob, flush=True)
+    prob = model.predict(sim, samples=10000)
+    avgprob = 10**np.average(np.log10(prob))
+    print("Done", nsim, "with", avgprob, flush=True)
     return prob
 
 

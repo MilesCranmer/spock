@@ -290,6 +290,6 @@ class StabilityRegression(object):
             all_full_samples.append(full_samples)
 
         out = np.array(all_full_samples)
-        best_out_over_trios = out[np.argsort(np.average(out, axis=1))[0]]
+        best_out_over_trios = np.min(out, axis=0)
         return 10**best_out_over_trios
 
