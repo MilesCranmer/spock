@@ -127,7 +127,9 @@ def orbtseries(sim, args, trio):
     # Fill in values below
     
     times = np.linspace(0, Norbits*sim.particles[1].P, Nout) # TTV systems don't have ps[1].P=1, so must multiply!
-    
+   
+    P0 = sim.particles[1].P
+    a0 = sim.particles[1].a
     for i, time in enumerate(times):
         try:
             sim.integrate(time, exact_finish_time=0)
@@ -142,8 +144,8 @@ def orbtseries(sim, args, trio):
                 skipped += 1
                 continue
             #print(j, 'actually in', trio, skipped)
-            val[i,0] = sim.t
-            val[i,6*(j-skipped)+1] = o.a
+            val[i,0] = sim.t/P0
+            val[i,6*(j-skipped)+1] = o.a/a0
             val[i,6*(j-skipped)+2] = o.e
             val[i,6*(j-skipped)+3] = o.inc
             val[i,6*(j-skipped)+4] = o.Omega
@@ -1194,7 +1196,7 @@ def restseriesv5(sim, args, trio): # corresponds to ressummaryfeaturesxgbv5
         for p in [ps[i] for i in trio]:
             AMD += p.m*np.sqrt(sim.G*ps[0].m*p.a)*(1-np.sqrt(1-p.e**2)*np.cos(p.inc))
         
-        val[i,0] = sim.t  # time
+        val[i,0] = sim.t/P0  # time
 
         Ns = 8
         for j, [label, i1, i2] in enumerate(pairs):
