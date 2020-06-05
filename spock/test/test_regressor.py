@@ -1,7 +1,8 @@
+import numpy as np
 import rebound
 import unittest
-from spock import StabilityClassifier, Nbody
-from spock.feature_functions import get_tseries
+from spock import StabilityRegressor, Nbody
+from spock.feature_functions import get_extended_tseries
 from spock.simsetup import init_sim_parameters
 
 def rescale(sim, dscale, tscale, mscale):                                                                      
@@ -18,6 +19,27 @@ class TestRegressor(unittest.TestCase):
     def setUp(self):
         self.model = StabilityRegressor()
 
+    def test_extended_tseries(self):
+        sim = rebound.Simulation()
+        sim.add(m=1.)
+        sim.add(m=1.e-5, P=1.)
+        sim.add(m=1.e-5, P=2.)
+        sim.add(m=1.e-5, P=3.)
+        init_sim_parameters(sim)
+        simc = sim.copy()
+        triotseries, stable = get_extended_tseries(simc, (10000, 80, [[1,2,3]]))
+
+        minP = np.min([p.P for p in sim.particles[1:sim.N_real]])
+        times = np.linspace(0, 10000*np.abs(minP), 80)
+        e2 = np.zeros(80)
+        theta3 = np.zeros(80)
+        for i, time in enumerate(times):
+            sim.integrate(time, exact_finish_time=0)
+            e2[i] = sim.particles[2].e
+            theta3[i] = sim.particles[3].theta
+        self.assertEqual(e2[37], triotseries[0][37,15])
+        self.assertEqual(theta3[12], triotseries[0][12,25])
+    
     def test_repeat(self):
         sim = rebound.Simulation()
         sim.add(m=1.)
@@ -31,7 +53,7 @@ class TestRegressor(unittest.TestCase):
     def test_same_trajectory(self):
         sim = rebound.Simulation('longstable.bin')
         init_sim_parameters(sim)
-        _, _ = get_tseries(sim, (1e4, 80, [[1,2,3]]))
+        _, _ = get_extended_tseries(sim, (1e4, 80, [[1,2,3]]))
         x1 = sim.particles[1].x
 
         sim = rebound.Simulation('longstable.bin')
@@ -92,6 +114,11 @@ class TestRegressor(unittest.TestCase):
     def test_unstable_in_short_integration(self):
         sim = rebound.Simulation('unstable.bin')
         self.assertEqual(self.model.predict_stable(sim), 0)
+    
+    def test_tinst_unstable_in_short_integration(self):
+        sim = rebound.Simulation('unstable.bin')
+        t_inst = self.model.predict_instability_time(sim)
+        self.assertAlmostEqual(t_inst, 201.450, delta=1.e-8)
     
     def test_solarsystem(self):
         sim = rebound.Simulation('solarsystem.bin')

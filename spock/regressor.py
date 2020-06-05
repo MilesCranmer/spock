@@ -1,5 +1,6 @@
 import numpy as np
 from .simsetup import init_sim_parameters
+from .feature_functions import get_extended_tseries
 
 class StabilityRegressor():
     def __init__(self):
@@ -10,46 +11,36 @@ class StabilityRegressor():
             raise AttributeError("SPOCK Error: SPOCK only applicable to systems with 3 or more planets") 
         
     def predict_stable(self, sim):
-        sim = sim.copy()
-        init_sim_parameters(sim)
-        self.check_errors(sim)
-        
-        trios = [[i,i+1,i+2] for i in range(1,sim.N_real-2)] # list of adjacent trios   
-        featureargs = [10000, 80, trios]
-        triotseries, stable = get_tseries(sim, args)
-        
-        if stable == False:
+        t_inst = self.predict_instability_time(sim)
+        minP = np.min([p.P for p in sim.particles[1:sim.N_real]])
+        if t_inst >= 1e9*minP:
+            return 1
+        else:
             return 0
-       
-        trioprobs = self.predict_from_tseries(triotseries)
-        return trioprobs.min()          # minimum prob among all trios tested
-
+        
     def predict_from_tseries(self, triotseries):
-        trioprobs = np.zeros(len(triotseries))
+        # predict an instability time for each trio in triotseries
+        trio_tinsts = np.zeros(len(triotseries))
         for i, tseries_array in enumerate(triotseries):
-            trioprobs[i] = self.evaluate_model(tseries_array)
-        return trioprobs
+            trio_tinsts[i] = self.evaluate_model(tseries_array)
+        return trio_tinsts
 
     def evaluate_model(self, tseries_array):
         # plug in function
         return 0 
 
-    def predict_instability_time(self, sim, tmax=None):
+    def predict_instability_time(self, sim):
         sim = sim.copy()
         init_sim_parameters(sim)
         self.check_errors(sim)
         
         trios = [[i,i+1,i+2] for i in range(1,sim.N_real-2)] # list of adjacent trios   
-        featureargs = [10000, 80, trios]
+        args = [10000, 80, trios]
         triotseries, stable = get_extended_tseries(sim, args)
-        # should return tinst if unstabble so we can  return that 
+        
         if stable == False:
-            return 0
+            return sim.t
        
-        trioprobs = self.predict_from_tseries(triotseries)
-            stable = False
-            return sim.t, stable
-            
-        stable = True
-        return tmax, stable
+        trio_tinsts = self.predict_from_tseries(triotseries)
+        return trio_tinsts.min()
 

@@ -10,5 +10,6 @@ except ImportError:
 
 from .classifier import StabilityClassifier
 from .nbody import Nbody
+from .regressor import StabilityRegressor
 
-__all__ = ["StabilityClassifier", "Nbody"]
+__all__ = ["StabilityClassifier", "Nbody", "StabilityRegressor"]
