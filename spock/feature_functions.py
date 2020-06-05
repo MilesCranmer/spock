@@ -60,6 +60,63 @@ def find_strongest_MMR(sim, i1, i2):
 
     return j, k, maxstrength
 
+def populate_extended_trio(sim, trio, pairs, tseries, i, a10):
+    Ns = 3
+    ps = sim.particles
+    for q, [label, i1, i2] in enumerate(pairs):
+        m1 = ps[i1].m
+        m2 = ps[i2].m
+        e1x, e1y = ps[i1].e*np.cos(ps[i1].pomega), ps[i1].e*np.sin(ps[i1].pomega)
+        e2x, e2y = ps[i2].e*np.cos(ps[i2].pomega), ps[i2].e*np.sin(ps[i2].pomega)
+        tseries[i,Ns*q+1] = np.sqrt((e2x-e1x)**2 + (e2y-e1y)**2)
+        tseries[i,Ns*q+2] = np.sqrt((m1*e1x + m2*e2x)**2 + (m1*e1y + m2*e2y)**2)/(m1+m2)
+        j, k, tseries[i,Ns*q+3] = find_strongest_MMR(sim, i1, i2) 
+
+    tseries[i,7] = sim.calculate_megno() # megno
+
+    orbits = sim.calculate_orbits()
+    for j, k in enumerate(trio):
+        o = orbits[k-1]
+        tseries[i, 8+6*j] = o.a/a10
+        tseries[i, 9+6*j] = o.e
+        tseries[i, 10+6*j] = o.inc
+        tseries[i, 11+6*j] = o.Omega
+        tseries[i, 12+6*j] = o.pomega
+        tseries[i, 13+6*j] = o.theta
+
+def get_extended_tseries(sim, args):
+    Norbits = args[0]
+    Nout = args[1]
+    trios = args[2]
+   
+    a10s = [sim.particles[trio[0]].a for trio in trios]
+    minP = np.min([p.P for p in sim.particles[1:sim.N_real]])
+
+    # want hyperbolic case to run so it raises exception
+    times = np.linspace(0, Norbits*np.abs(minP), Nout)
+    triopairs, triotseries = [], []
+    for tr, trio in enumerate(trios): # For each trio there are two adjacent pairs 
+        triopairs.append(get_pairs(sim, trio))
+        triotseries.append(np.zeros((Nout, 26))*np.nan)
+  
+    for i, time in enumerate(times):
+        try:
+            sim.integrate(time, exact_finish_time=0)
+        except rebound.Collision:
+            stable = False
+            return triotseries, stable
+
+        for tseries in triotseries:
+            tseries[i,0] = sim.t/minP  # time
+
+        for tr, trio in enumerate(trios):
+            pairs = triopairs[tr]
+            tseries = triotseries[tr] 
+            populate_extended_trio(sim, trio, pairs, tseries, i, a10s[tr])
+    
+    stable = True
+    return triotseries, stable
+
 def populate_trio(sim, trio, pairs, tseries, i):
     Ns = 3
     ps = sim.particles
@@ -78,9 +135,11 @@ def get_tseries(sim, args):
     Norbits = args[0]
     Nout = args[1]
     trios = args[2]
+    
+    minP = np.min([p.P for p in sim.particles[1:sim.N_real]])
 
-    P0 = np.abs(sim.particles[1].P) # want hyperbolic case to run so it raises exception
-    times = np.linspace(0, Norbits*P0, Nout)
+    # want hyperbolic case to run so it raises exception
+    times = np.linspace(0, Norbits*np.abs(minP), Nout)
     
     triopairs, triotseries = [], []
     for tr, trio in enumerate(trios): # For each trio there are two adjacent pairs 
@@ -95,7 +154,7 @@ def get_tseries(sim, args):
             return triotseries, stable
 
         for tseries in triotseries:
-            tseries[i,0] = sim.t/P0  # time
+            tseries[i,0] = sim.t/minP  # time
 
         for tr, trio in enumerate(trios):
             pairs = triopairs[tr]
