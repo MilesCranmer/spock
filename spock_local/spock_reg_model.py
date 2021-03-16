@@ -8,7 +8,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import torch
 from torch import nn
-from torch.autograd import Variable
+from torch.autograd import Variable, grad
 import sys
 import torch.nn.functional as F
 from torch.nn import Parameter
@@ -905,6 +905,44 @@ class SWAGModel(VarModel):
         #Each is (batch,)
 
         return torch.cat((mu, std), dim=1)
+
+    def grad_swag_forward(self, x):
+        if self.fix_megno or self.fix_megno2:
+            if self.fix_megno:
+                megno_avg_std = self.summarize_megno(x)
+            #(batch, 2)
+            x = self.zero_megno(x)
+
+        if not self.include_mmr:
+            x = self.zero_mmr(x)
+
+        if not self.include_nan:
+            x = self.zero_nan(x)
+
+        if not self.include_eplusminus:
+            x = self.zero_eplusminus(x)
+
+        summary_stats = self.compute_summary_stats(x)
+        if self.fix_megno:
+            summary_stats = torch.cat([summary_stats, megno_avg_std], dim=1)
+
+        #summary is (batch, feature)
+
+        mu, std = self.predict_instability(summary_stats)
+        #Each is (batch,)
+
+        return mu, std
+
+    def grad_swag(self, x, scale=0.5):
+        """No augmentation happens here."""
+
+        # Sample using SWAG using recorded model moments
+        self.sample_weights(scale=scale)
+
+        x = Variable(x, requires_grad=True)
+        mu, std = self.grad_swag_forward(x)
+        return grad(mu.sum(), x), grad(std.sum(), x)
+
 
 
 def save_swag(swag_model, path):
