@@ -47,7 +47,7 @@ regression_models = [
 'models/regression/steps=300000_megno=0_angles=1_power=0_hidden=40_latent=20_nommr=1_nonan=1_noeplusminus=1_v50_9_output.pkl'
 ]
 
-exec(open('spock/version.py').read())
+exec(open('spock_spock/version.py').read())
 setup(name='spock',
     version=__version__,
     description='Stability of Planetary Orbital Configurations Klassifier',
