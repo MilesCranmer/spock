@@ -6,11 +6,11 @@ with open(os.path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 classifier_requirements = [
-    'rebound', 'scikit-learn', 'xgboost>=1.1.0'
+    'rebound>=3.14.0', 'scikit-learn', 'xgboost>=1.1.0'
 ]
 regression_requirements = [
     'matplotlib', 'pytorch_lightning>=1.0.0', 'torch>=1.5.1', 'torchvision',
-    'scipy', 'rebound', 'scikit-learn', 'einops', 'matplotlib', 'numpy',
+    'scipy', 'rebound>=3.14.0', 'scikit-learn', 'einops', 'matplotlib', 'numpy',
     'pandas'
 ]
 
@@ -52,6 +52,7 @@ setup(name='spock',
     version=__version__,
     description='Stability of Planetary Orbital Configurations Klassifier',
     long_description=long_description,
+    long_description_content_type="text/markdown",
     url='https://github.com/dtamayo/spock',
     author='Daniel Tamayo',
     author_email='tamayo.daniel@gmail.com',

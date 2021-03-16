@@ -5,7 +5,6 @@ import os
 from collections import OrderedDict
 from .tseries_feature_functions import get_extended_tseries
 from copy import deepcopy as copy
-from sklearn.preprocessing import StandardScaler
 import torch
 from torch import nn
 from torch.nn import Parameter
@@ -26,6 +25,7 @@ from .simsetup import init_sim_parameters
 from multiprocessing import cpu_count
 from multiprocessing.pool import ThreadPool as Pool
 import rebound
+import random
 warnings.filterwarnings('ignore', "DeprecationWarning: Using or importing the ABCs")
 
 def fitted_prior():
@@ -138,10 +138,8 @@ class DeepRegressor(object):
             load_swag(fname).cpu()
             for i, fname in enumerate(glob.glob(pwd + '/' + filebase)) #0.78, 0.970
         ]
-        self.ssX = StandardScaler()
-
         #Data scaling parameters:
-        self.ssX.scale_ = np.array([2.88976974e+03, 6.10019661e-02, 4.03849732e-02, 4.81638693e+01,
+        self.scale_ = np.array([2.88976974e+03, 6.10019661e-02, 4.03849732e-02, 4.81638693e+01,
                    6.72583662e-02, 4.17939679e-02, 8.15995339e+00, 2.26871589e+01,
                    4.73612029e-03, 7.09223721e-02, 3.06455099e-02, 7.10726478e-01,
                    7.03392022e-01, 7.07873597e-01, 7.06030923e-01, 7.04728204e-01,
@@ -152,7 +150,7 @@ class DeepRegressor(object):
                    7.03646004e-01, 7.08017286e-01, 7.06162814e-01, 2.12569430e-05,
                    2.35019125e-05, 2.04211110e-05, 7.51048890e-02, 3.94254400e-01,
                    7.11351099e-02])
-        self.ssX.mean_ = np.array([ 4.95458585e+03,  5.67411891e-02,  3.83176945e-02,  2.97223474e+00,
+        self.mean_ = np.array([ 4.95458585e+03,  5.67411891e-02,  3.83176945e-02,  2.97223474e+00,
                    6.29733979e-02,  3.50074471e-02,  6.72845676e-01,  9.92794768e+00,
                    9.99628430e-01,  5.39591547e-02,  2.92795061e-02,  2.12480714e-03,
                   -1.01500319e-02,  1.82667162e-02,  1.00813201e-02,  5.74404197e-03,
@@ -163,7 +161,6 @@ class DeepRegressor(object):
                   -6.00523246e-04,  6.53016990e-03, -1.72038113e-03,  1.24807860e-05,
                    1.60314173e-05,  1.21732696e-05,  5.67292645e-03,  1.92488263e-01,
                    5.08607199e-03])
-        self.ssX.var_ = self.ssX.scale_**2
 
     def sample_full_swag(self, X_sample):
         """Pick a random model from the ensemble and sample from it
@@ -203,14 +200,18 @@ class DeepRegressor(object):
             Larger number increases accuracy but greatly decreases speed.
         return_samples (bool): return the raw samples as a second argument
         prior_above_9 (function): function defining the probability density
-            function of instability times above 1e9 orbits. By default
-            is a decaying prior which was fit to the training dataset.
-        Ncpus (int): Number of CPUs to use for calculation (only if passing more than one simulation). Default: Use all available cpus. 
+            function of instability times above 1e9 orbits of the innermost
+            planet. By default is a decaying prior which was fit to the training dataset.
+            This takes as input time in terms of the orbits of the innermost planet.
+        Ncpus (int): Number of CPUs to use for calculation (only if passing more than one simulation).
+            Default: Use all available cpus. 
 
         Returns:
 
-        center_estimate (float): instability time in units of initial orbit
-            of the innermost planet
+        center_estimate (float): instability time in units of
+            the rebound simulation's time units (e.g., if P=1.
+            for the innermost planet, this estimate will be
+            in units of orbits)
         lower (float): 16th percentile instability time
         upper (float): 84th percentile instability time
         [t_inst_samples (array): raw samples of the posterior]
@@ -241,21 +242,23 @@ class DeepRegressor(object):
 
         sim (rebound.Simulation or list): Orbital configuration(s) to test
         tmax (float or list): Time at which the system is queried as stable,
-            in units of initial orbit of innermost planet
+            in rebound simulation time units.
         samples (int): Number of samples to use
         seed (int): Random seed
         max_model_samples (int): maximum number of times to re-generate model parameters.
             Larger number increases accuracy but greatly decreases speed.
         return_samples (bool): return the raw samples as a second argument
         prior_above_9 (function): function defining the probability density
-            function of instability times above 1e9 orbits. By default
-            is a decaying prior which was fit to the training dataset.
-        Ncpus (int): Number of CPUs to use for calculation (only if passing more than one simulation). Default: Use all available cpus. 
+            function of instability times above 1e9 orbits of the innermost
+            planet. By default is a decaying prior which was fit to the training dataset.
+            This takes as input time in terms of the orbits of the innermost planet.
+        Ncpus (int): Number of CPUs to use for calculation (only if passing more than one simulation).
+            Default: Use all available cpus. 
 
         Returns:
 
         p (float): probability of stability past the given tmax
-            (default 1e9 orbits)
+            (default 1e9*min(P) orbits)
         [t_inst_samples (array): raw samples of the posterior]
         """
         batched = self.is_batched(sim)
@@ -265,9 +268,13 @@ class DeepRegressor(object):
 
         if tmax is None:
             if batched:
-                tmax = np.ones(len(sim)) * 1e9
+                tmax = np.array([
+                    1e9 *  
+                    np.min([np.abs(p.P) for p in s.particles[1:s.N_real]])
+                    for s in sim])
             else:
-                tmax = 1e9
+                minP = np.min([np.abs(p.P) for p in sim.particles[1:sim.N_real]])
+                tmax = 1e9 * minP
         elif batched:
             if isinstance(tmax, list):
                 tmax = np.array(tmax)
@@ -317,7 +324,7 @@ class DeepRegressor(object):
     @profile
     def sample_instability_time(self, sim, samples=1000, seed=None,
             max_model_samples=100, prior_above_9=fitted_prior(), Ncpus=None):
-        """Return samples from a posterior over log instability time (base 10) for
+        """Return samples from a posterior over instability time for
             given simulation(s). This returns samples from a simple prior for
             all times greater than 10^9 orbits.
 
@@ -329,18 +336,26 @@ class DeepRegressor(object):
         max_model_samples (int): maximum number of times to re-generate model parameters.
             Larger number increases accuracy but greatly decreases speed.
         prior_above_9 (function): function defining the probability density
-            function of instability times above 1e9 orbits. By default
-            is a decaying prior which was fit to the training dataset.
-        Ncpus (int): Number of CPUs to use for calculation (only if passing more than one simulation). Default: Use all available cpus. 
+            function of instability times above 1e9 orbits of the innermost
+            planet. By default is a decaying prior which was fit to the training dataset.
+            This takes as input time in terms of the orbits of the innermost planet.
+        Ncpus (int): Number of CPUs to use for calculation (only if
+            passing more than one simulation). Default: Use all available cpus. 
 
         Returns:
 
-        np.array: samples of the posterior (nsamples,) or (nsim, nsamples)
+        np.array: samples of the posterior (nsamples,) or (nsim, nsamples) for
+            instability time, in units of the rebound simulation.
         """
         batched = self.is_batched(sim)
 
         if seed is not None:
-            pl.seed_everything(seed)
+            os.environ["PL_GLOBAL_SEED"] = str(seed)
+            random.seed(seed)
+            np.random.seed(seed)
+            torch.manual_seed(seed)
+            if self.cuda:
+                torch.cuda.manual_seed_all(seed)
 
         if batched:
             n_sims = len(sim)
@@ -355,7 +370,8 @@ class DeepRegressor(object):
         else:
             out = generate_dataset(sim)
             if not isinstance(out, np.ndarray):
-                return np.ones(samples) * out
+                minP = np.min([np.abs(p.P) for p in sim.particles[1:sim.N_real]])
+                return np.ones(samples) * out * minP
             Xs = np.array([out])
 
         if len(Xs) > 0:
@@ -363,7 +379,7 @@ class DeepRegressor(object):
             ntrios = Xs.shape[1]
             nt = 100
             X = E.rearrange(Xs, 'batch trio () time feature -> (batch trio time) feature')
-            Xp = self.ssX.transform(X)
+            Xp = (X - self.mean_[None, :]) / self.scale_[None, :]
             Xp = E.rearrange(Xp, '(batch trio time) feature -> (batch trio) time feature',
                              batch=nbatch, trio=ntrios, time=nt)
 
@@ -402,17 +418,21 @@ class DeepRegressor(object):
             # print(time_estimates.shape)
             #HACK TODO - need already computed estimates
 
-        if not batched: return time_estimates[0]
+        if not batched:
+            minP = np.min([np.abs(p.P) for p in sim.particles[1:sim.N_real]])
+            return time_estimates[0] * minP
 
         j = 0
         k = 0
         correct_order_results = []
         for i in range(n_sims):
+            cur_sim = sim[i]
+            minP = np.min([np.abs(p.P) for p in cur_sim.particles[1:cur_sim.N_real]])
             if i in already_computed_results_idx:
-                correct_order_results.append(already_computed_results_times[k] * np.ones(samples))
+                correct_order_results.append(already_computed_results_times[k] * np.ones(samples) * minP)
                 k += 1
             else:
-                correct_order_results.append(time_estimates[j])
+                correct_order_results.append(time_estimates[j] * minP)
                 j += 1
 
         correct_order_results = np.array(correct_order_results, dtype=np.float64)

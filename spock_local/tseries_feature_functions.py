@@ -7,7 +7,6 @@ import warnings
 import pandas as pd
 from .feature_functions import find_strongest_MMR
 
-warnings.filterwarnings("error")
 # sorts out which pair of planets has a smaller EMcross, labels that pair inner, other adjacent pair outer
 # returns a list of two lists, with [label (near or far), i1, i2], where i1 and i2 are the indices, with i1 
 # having the smaller semimajor axis
@@ -78,10 +77,10 @@ def get_extended_tseries(sim, args, mmr=True, megno=True):
     trios = args[2]
    
     a10s = [sim.particles[trio[0]].a for trio in trios]
-    minP = np.min([p.P for p in sim.particles[1:sim.N_real]])
+    minP = np.min([np.abs(p.P) for p in sim.particles[1:sim.N_real]])
 
     # want hyperbolic case to run so it raises exception
-    times = np.linspace(0, Norbits*np.abs(minP), Nout)
+    times = np.linspace(0, Norbits*minP, Nout)
     triopairs, triotseries = [], []
     # axis_labels = ['']*26
     # axis_labels[0] = 'time'

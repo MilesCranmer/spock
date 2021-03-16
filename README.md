@@ -11,6 +11,8 @@
 
 ![image](https://raw.githubusercontent.com/dtamayo/spock/master/paper_plots/spockpr.jpg)
 
+[Documentation](https://spock-instability.readthedocs.io/en/latest/)
+
 # Quickstart
 
 Let's predict the probability that a given 3-planet system is stable
@@ -38,6 +40,9 @@ print(feature_model.predict_stable(sim))
 median, lower, upper = deep_model.predict_instability_time(sim, samples=10000)
 print(int(median))
 # >>> 419759
+
+# This time in the time units you used in setting up the REBOUND Simulation above
+# Since we set the innermost planet orbit to unity, this corresponds to 419759 innermost planet orbits
 ```
 
 # Examples
@@ -50,20 +55,21 @@ The example notebooks contain many additional examples:
 
 # Installation
 
-SPOCK is compatible with both Linux and Mac.
-
-Install from master with:
-
-```
-pip install git+https://github.com/dtamayo/spock
-```
-
-SPOCK relies on XGBoost, which has installation issues with OpenMP on
-Mac OSX. If you have problems
-(<https://github.com/dmlc/xgboost/issues/4477>), the easiest way is
+SPOCK is compatible with both Linux and Mac. SPOCK relies on XGBoost, which has installation issues with OpenMP on
+Mac OSX. If you have problems (<https://github.com/dmlc/xgboost/issues/4477>), the easiest way is
 probably to install [homebrew](brew.sh), and:
 
 ```
 brew install libomp
-pip install git+https://github.com/dtamayo/spock
-``` 
+```
+
+The most straightforward way to avoid any version conflicts is to download the Anaconda Python distribution and make a separate conda environment.
+
+Here we create we create a new conda environment called `spock` and install all the required dependencies
+```
+conda create -q --name spock -c pytorch -c conda-forge python=3.7 numpy scipy pandas scikit-learn matplotlib torchvision pytorch xgboost rebound einops jupyter pytorch-lightning ipython h5py
+conda activate spock
+pip install spock
+```
+
+Each time you want to use spock you will first have to activate this `spock` conda environment (google conda environments).
